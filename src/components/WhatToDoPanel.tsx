@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { createGuard } from "@/lib/guard";
 import {
   WishlistItem,
   WishlistCategory,
@@ -154,12 +155,13 @@ export default function WhatToDoPanel({
     if (isOpen) fetchItems();
   }, [isOpen, fetchItems]);
 
-  const handleToggleConfirm = async (item: WishlistItem) => {
+  const wtdGuard = createGuard();
+
+  const handleToggleConfirm = (item: WishlistItem) => wtdGuard(async () => {
     const place = parsePlaceDetails(item);
     if (!place) return;
 
     if (item.confirmed) {
-      // Unconfirm
       const updated = { ...place, confirmed_slots: [] };
       await fetch(`/api/schedules/${scheduleId}/wishlist`, {
         method: "PUT",
@@ -171,9 +173,9 @@ export default function WhatToDoPanel({
     } else {
       setConfirmingItem(item);
     }
-  };
+  });
 
-  const handleConfirmPlace = async (item: WishlistItem, slots: TimeBlock[]) => {
+  const handleConfirmPlace = (item: WishlistItem, slots: TimeBlock[]) => wtdGuard(async () => {
     const place = parsePlaceDetails(item);
     if (!place) return;
     const updated = { ...place, confirmed_slots: slots };
@@ -187,7 +189,7 @@ export default function WhatToDoPanel({
       fetchItems();
       onConfirmChange?.();
     }
-  };
+  });
 
   // Group by category
   const grouped: Record<string, WishlistItem[]> = {};

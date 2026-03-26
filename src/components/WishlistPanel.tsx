@@ -10,6 +10,7 @@ import {
   StayDetails,
   TimeBlock,
 } from "@/lib/types";
+import { createGuard } from "@/lib/guard";
 import TransportForm from "./TransportForm";
 import PlaceForm from "./PlaceForm";
 import StayForm from "./StayForm";
@@ -125,35 +126,36 @@ function ItemDetailModal({
   const transport = parseTransportDetails(item);
   const place = parsePlaceDetails(item);
   const stay = parseStayDetails(item);
+  const guard = createGuard();
 
-  const handleDelete = async () => {
+  const handleDelete = () => guard(async () => {
     const res = await fetch(`/api/schedules/${scheduleId}/wishlist?itemId=${item.id}`, { method: "DELETE" });
     if (res.ok) { onUpdated(); onClose(); }
-  };
+  });
 
-  const handleEditTransport = async (details: TransportDetails, addedBy: string) => {
+  const handleEditTransport = (details: TransportDetails, addedBy: string) => guard(async () => {
     const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId: item.id, title: details.transport_name, added_by: addedBy, details }),
     });
     if (res.ok) { setEditing(false); onUpdated(); onClose(); }
-  };
+  });
 
-  const handleEditPlace = async (details: PlaceDetails, addedBy: string) => {
+  const handleEditPlace = (details: PlaceDetails, addedBy: string) => guard(async () => {
     const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId: item.id, title: details.name, added_by: addedBy, details }),
     });
     if (res.ok) { setEditing(false); onUpdated(); onClose(); }
-  };
+  });
 
-  const handleEditStay = async (details: StayDetails, addedBy: string) => {
+  const handleEditStay = (details: StayDetails, addedBy: string) => guard(async () => {
     const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId: item.id, title: details.name, added_by: addedBy, details }),
     });
     if (res.ok) { setEditing(false); onUpdated(); onClose(); }
-  };
+  });
 
   if (editing) {
     if (transport) {
@@ -412,47 +414,49 @@ export default function WishlistPanel({
   useEffect(() => { if (isOpen) fetchItems(); }, [isOpen, fetchItems]);
 
   // ─── Add handlers ───
-  const handleAddTransport = async (details: TransportDetails, addedBy: string) => {
+  const panelGuard = createGuard();
+
+  const handleAddTransport = (details: TransportDetails, addedBy: string) => panelGuard(async () => {
     const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: "교통", title: details.transport_name, added_by: addedBy, details }),
     });
     if (res.ok) { setShowAddModal(false); fetchItems(); }
-  };
+  });
 
-  const handleAddPlace = async (details: PlaceDetails, addedBy: string) => {
+  const handleAddPlace = (details: PlaceDetails, addedBy: string) => panelGuard(async () => {
     const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: activeCategory, title: details.name, added_by: addedBy, details }),
     });
     if (res.ok) { setShowAddModal(false); fetchItems(); }
-  };
+  });
 
-  const handleAddStay = async (details: StayDetails, addedBy: string) => {
+  const handleAddStay = (details: StayDetails, addedBy: string) => panelGuard(async () => {
     const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: "숙박", title: details.name, added_by: addedBy, details }),
     });
     if (res.ok) { setShowAddModal(false); fetchItems(); }
-  };
+  });
 
   // ─── Confirm toggle ───
-  const handleConfirmClick = (item: WishlistItem) => {
+  const handleConfirmClick = (item: WishlistItem) => panelGuard(async () => {
     const isPlace = PLACE_CATEGORIES.includes(item.category);
     const isStay = item.category === "숙박";
 
     if (isPlace || isStay) {
       if (item.confirmed) {
-        handleUnconfirmPlace(item);
+        await _unconfirmPlace(item);
       } else {
         setConfirmingItem(item);
       }
     } else {
-      handleToggleConfirmSimple(item);
+      await _toggleConfirmSimple(item);
     }
-  };
+  });
 
-  const handleToggleConfirmSimple = async (item: WishlistItem) => {
+  const _toggleConfirmSimple = async (item: WishlistItem) => {
     const res = await fetch(`/api/schedules/${scheduleId}/wishlist`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId: item.id, confirmed: !item.confirmed }),
@@ -460,7 +464,7 @@ export default function WishlistPanel({
     if (res.ok) { fetchItems(); onConfirmChange?.(); }
   };
 
-  const handleUnconfirmPlace = async (item: WishlistItem) => {
+  const _unconfirmPlace = async (item: WishlistItem) => {
     const place = parsePlaceDetails(item);
     const stay = parseStayDetails(item);
     const details = place || stay;
@@ -473,7 +477,7 @@ export default function WishlistPanel({
     if (res.ok) { fetchItems(); onConfirmChange?.(); }
   };
 
-  const handleConfirmPlace = async (item: WishlistItem, slots: TimeBlock[]) => {
+  const handleConfirmPlace = (item: WishlistItem, slots: TimeBlock[]) => panelGuard(async () => {
     const place = parsePlaceDetails(item);
     const stay = parseStayDetails(item);
     const details = place || stay;
@@ -484,7 +488,7 @@ export default function WishlistPanel({
       body: JSON.stringify({ itemId: item.id, confirmed: true, details: updated }),
     });
     if (res.ok) { setConfirmingItem(null); fetchItems(); onConfirmChange?.(); }
-  };
+  });
 
   const isTransport = activeCategory === "교통";
   const isPlace = PLACE_CATEGORIES.includes(activeCategory);

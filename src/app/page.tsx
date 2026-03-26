@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import CalendarPicker from "@/components/CalendarPicker";
+import { useGuardState } from "@/lib/guard";
 import Timeline from "@/components/Timeline";
 import type { SelectedTimeRange, SelectedEventInfo } from "@/components/Timeline";
 import WishlistPanel from "@/components/WishlistPanel";
@@ -43,8 +44,9 @@ export default function Home() {
   const [participantsList, setParticipantsList] = useState<string[]>([]);
   const [newParticipantName, setNewParticipantName] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("90");
+  const [pageGuard, pageBusy] = useGuardState();
 
-  const handleCreate = async () => {
+  const handleCreate = () => pageGuard(async () => {
     setError("");
 
     if (!name || !password || !participantsList.length) {
@@ -93,9 +95,9 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  });
 
-  const handleLogin = async () => {
+  const handleLogin = () => pageGuard(async () => {
     setError("");
     if (!name || !password) {
       setError("스케줄 이름과 비밀번호를 입력해주세요.");
@@ -127,9 +129,9 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  });
 
-  const handleDatesSelected = async (start: string, end: string) => {
+  const handleDatesSelected = (start: string, end: string) => pageGuard(async () => {
     if (!schedule) return;
     setLoading(true);
     try {
@@ -151,7 +153,17 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  });
+
+  // Global loading overlay
+  const loadingOverlay = pageBusy && (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20 backdrop-blur-[1px]">
+      <div className="bg-white dark:bg-gray-800 rounded-xl px-6 py-4 shadow-lg flex items-center gap-3">
+        <div className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+        <span className="text-sm text-gray-600 dark:text-gray-300">처리 중...</span>
+      </div>
+    </div>
+  );
 
   // Landing page: create or login
   if (view === "landing") {
@@ -333,6 +345,7 @@ export default function Home() {
             </button>
           </div>
         </div>
+        {loadingOverlay}
       </main>
     );
   }
@@ -376,6 +389,7 @@ export default function Home() {
             )}
           </div>
         </div>
+        {loadingOverlay}
       </main>
     );
   }
@@ -727,6 +741,7 @@ export default function Home() {
           />
         )}
 
+        {loadingOverlay}
       </main>
     );
   }
