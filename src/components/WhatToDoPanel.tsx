@@ -128,10 +128,12 @@ export default function WhatToDoPanel({
   onConfirmChange,
 }: WhatToDoPanelProps) {
   const [items, setItems] = useState<WishlistItem[]>([]);
+  const [loadingItems, setLoadingItems] = useState(true);
   const [detailItem, setDetailItem] = useState<WishlistItem | null>(null);
   const [confirmingItem, setConfirmingItem] = useState<WishlistItem | null>(null);
 
   const fetchItems = useCallback(async () => {
+    setLoadingItems(true);
     try {
       const results: WishlistItem[] = [];
       for (const cat of TARGET_CATEGORIES) {
@@ -143,12 +145,12 @@ export default function WhatToDoPanel({
           results.push(...data);
         }
       }
-      // Filter: must have business hours covering selected range
       const filtered = results.filter((item) =>
         hasOverlap30Min(item, selectedRange.date, selectedRange.startTime, selectedRange.endTime)
       );
       setItems(filtered);
     } catch { /* silently fail */ }
+    setLoadingItems(false);
   }, [scheduleId, selectedRange]);
 
   useEffect(() => {
@@ -215,7 +217,13 @@ export default function WhatToDoPanel({
 
         {/* Items */}
         <div className="flex-1 overflow-y-auto p-4">
-          {items.length === 0 && (
+          {loadingItems && (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+              <span className="ml-2 text-sm text-gray-400 dark:text-gray-500">일정을 찾고 있어요...</span>
+            </div>
+          )}
+          {!loadingItems && items.length === 0 && (
             <div className="text-center text-gray-400 dark:text-gray-500 text-sm py-12">
               이 시간대에 가능한 일정이 없어요.<br />
               <span className="text-xs text-gray-300 mt-1 block">위시리스트에 영업 시간을 등록해보세요</span>

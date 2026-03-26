@@ -404,11 +404,29 @@ export default function WishlistPanel({
     return () => { window.removeEventListener("mousemove", onMouseMove); window.removeEventListener("mouseup", onMouseUp); };
   }, []);
 
+  // Cache: category → items, invalidated on mutations
+  const cacheRef = useRef<Record<string, WishlistItem[]>>({});
+  const [loadingItems, setLoadingItems] = useState(false);
+
+  const invalidateCache = () => { cacheRef.current = {}; };
+
   const fetchItems = useCallback(async () => {
+    // Show cached immediately if available
+    const cached = cacheRef.current[activeCategory];
+    if (cached) {
+      setItems(cached);
+    } else {
+      setLoadingItems(true);
+    }
     try {
       const res = await fetch(`/api/schedules/${scheduleId}/wishlist?category=${encodeURIComponent(activeCategory)}`);
-      if (res.ok) setItems(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        cacheRef.current[activeCategory] = data;
+        setItems(data);
+      }
     } catch { /* silently fail */ }
+    setLoadingItems(false);
   }, [scheduleId, activeCategory]);
 
   useEffect(() => { if (isOpen) fetchItems(); }, [isOpen, fetchItems]);
@@ -421,7 +439,7 @@ export default function WishlistPanel({
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: "교통", title: details.transport_name, added_by: addedBy, details }),
     });
-    if (res.ok) { setShowAddModal(false); fetchItems(); }
+    if (res.ok) { setShowAddModal(false); invalidateCache(); fetchItems(); }
   });
 
   const handleAddPlace = (details: PlaceDetails, addedBy: string) => panelGuard(async () => {
@@ -429,7 +447,7 @@ export default function WishlistPanel({
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: activeCategory, title: details.name, added_by: addedBy, details }),
     });
-    if (res.ok) { setShowAddModal(false); fetchItems(); }
+    if (res.ok) { setShowAddModal(false); invalidateCache(); fetchItems(); }
   });
 
   const handleAddStay = (details: StayDetails, addedBy: string) => panelGuard(async () => {
@@ -437,7 +455,7 @@ export default function WishlistPanel({
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ category: "숙박", title: details.name, added_by: addedBy, details }),
     });
-    if (res.ok) { setShowAddModal(false); fetchItems(); }
+    if (res.ok) { setShowAddModal(false); invalidateCache(); fetchItems(); }
   });
 
   // ─── Confirm toggle ───
@@ -461,7 +479,7 @@ export default function WishlistPanel({
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId: item.id, confirmed: !item.confirmed }),
     });
-    if (res.ok) { fetchItems(); onConfirmChange?.(); }
+    if (res.ok) { invalidateCache(); fetchItems(); onConfirmChange?.(); }
   };
 
   const _unconfirmPlace = async (item: WishlistItem) => {
@@ -474,7 +492,7 @@ export default function WishlistPanel({
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ itemId: item.id, confirmed: false, details: updated }),
     });
-    if (res.ok) { fetchItems(); onConfirmChange?.(); }
+    if (res.ok) { invalidateCache(); fetchItems(); onConfirmChange?.(); }
   };
 
   const handleConfirmPlace = (item: WishlistItem, slots: TimeBlock[]) => panelGuard(async () => {
@@ -554,7 +572,14 @@ export default function WishlistPanel({
 
         <div className="flex-1 overflow-y-auto p-4">
           {items.length === 0 && (
-            <div className="text-center text-gray-400 dark:text-gray-500 text-sm py-12">아직 추가된 항목이 없어요</div>
+            <div className="text-center text-gray-400 dark:text-gray-500 text-sm py-12">
+              {loadingItems ? (
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin" />
+                  <span>불러오는 중...</span>
+                </div>
+              ) : "아직 추가된 항목이 없어요"}
+            </div>
           )}
           <div className="space-y-2">
             {items.map((item) => (
@@ -611,7 +636,7 @@ export default function WishlistPanel({
       {detailItem && (
         <ItemDetailModal item={detailItem} participants={participants} tripStart={tripStart} tripEnd={tripEnd}
           scheduleId={scheduleId} tripDates={tripDates}
-          onClose={() => setDetailItem(null)} onUpdated={() => { fetchItems(); onConfirmChange?.(); }} />
+          onClose={() => setDetailItem(null)} onUpdated={() => { invalidateCache(); fetchItems(); onConfirmChange?.(); }} />
       )}
 
       {/* Confirm Schedule Modal (place categories) */}

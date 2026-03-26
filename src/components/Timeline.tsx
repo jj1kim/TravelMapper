@@ -326,6 +326,7 @@ export default function Timeline({
   }, [feasibilityMode]);
 
   const isActiveMode = whatToDoMode || feasibilityMode;
+  const wtdDraggedRef = useRef(false);
 
   // What-to-do drag state
   const overviewRef = useRef<HTMLDivElement>(null);
@@ -514,6 +515,7 @@ export default function Timeline({
             const pos = getOverviewDateAndMin(e.clientX, e.clientY);
             if (!pos) return;
             (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+            wtdDraggedRef.current = true;
             setWtdDrag({ date: pos.date, startMin: pos.min, currentMin: pos.min });
           }}
           onPointerMove={(e) => {
@@ -546,7 +548,7 @@ export default function Timeline({
               return (
                 <button
                   key={date}
-                  onClick={() => { if (feasibilityMode) { onFeasibilityCancel?.(); } else if (!isActiveMode) { setSelectedDate(date); } }}
+                  onClick={() => { if (wtdDraggedRef.current) { wtdDraggedRef.current = false; return; } if (feasibilityMode) { onFeasibilityCancel?.(); } else if (!isActiveMode) { setSelectedDate(date); } }}
                   className={`flex-1 min-w-[80px] py-2 text-center border-l border-gray-200 dark:border-gray-700
                     transition-colors ${isActiveMode ? "" : "hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer"}`}
                 >
@@ -583,7 +585,7 @@ export default function Timeline({
               const dayEvts = eventsForDate(date);
               return (
                 <div key={date} className={`flex-1 min-w-[80px] border-l border-gray-100 dark:border-gray-700 relative ${isActiveMode ? "" : "cursor-pointer"}`}
-                  onClick={() => { if (feasibilityMode) { onFeasibilityCancel?.(); } else if (!isActiveMode) { setSelectedDate(date); } }}
+                  onClick={() => { if (wtdDraggedRef.current) { wtdDraggedRef.current = false; return; } if (feasibilityMode) { onFeasibilityCancel?.(); } else if (!isActiveMode) { setSelectedDate(date); } }}
                   style={{ height: VISIBLE_SLOTS.length * OVERVIEW_SLOT_H }}>
                   {/* Grid lines */}
                   {VISIBLE_SLOTS.map((time) => {

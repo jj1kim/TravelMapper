@@ -660,9 +660,9 @@ export default function Home() {
               setWhatToDoRange(range);
             }}
             feasibilityMode={feasibilityMode}
-            onFeasibilitySelect={async (start, end) => {
+            onFeasibilitySelect={(start, end) => {
               setFeasibilityMode(false);
-              try {
+              pageGuard(async () => { try {
                 const res = await fetch(`/api/schedules/${schedule.id}/wishlist`);
                 if (!res.ok) return;
                 const items = await res.json();
@@ -691,14 +691,14 @@ export default function Home() {
 
                 const url = `https://www.google.com/maps/dir/${encodeURIComponent(originStr)}/${encodeURIComponent(destStr)}/data=!4m5!4m4!2m3!6e0!7e2!8j${localEpoch}!3e3`;
                 window.open(url, "_blank");
-              } catch { /* silently fail */ }
+              } catch { /* silently fail */ } });
             }}
           />
         </div>
 
-        {/* Overlay stays during panel open */}
+        {/* Overlay stays during panel open — z-50 to cover timeline (z-40) */}
         {whatToDoRange && (
-          <div className="fixed inset-0 bg-black/30 z-30 pointer-events-none" />
+          <div className="fixed inset-0 bg-black/30 z-[45]" />
         )}
 
         <WishlistPanel
