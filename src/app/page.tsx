@@ -34,23 +34,27 @@ export default function Home() {
   const [whatToDoRange, setWhatToDoRange] = useState<SelectedTimeRange | null>(null);
   const [feasibilityMode, setFeasibilityMode] = useState(false);
   const [editingParticipants, setEditingParticipants] = useState(false);
-  const [participantsEditValue, setParticipantsEditValue] = useState("");
+  const [participantsEditList, setParticipantsEditList] = useState<string[]>([]);
+  const [participantsEditInput, setParticipantsEditInput] = useState("");
 
   // Form fields
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
-  const [participantsInput, setParticipantsInput] = useState("");
-  const [expiresInDays, setExpiresInDays] = useState(90);
+  const [participantsList, setParticipantsList] = useState<string[]>([]);
+  const [newParticipantName, setNewParticipantName] = useState("");
+  const [expiresInDays, setExpiresInDays] = useState("90");
 
   const handleCreate = async () => {
     setError("");
-    const participants = participantsInput
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean);
 
-    if (!name || !password || !participants.length) {
+    if (!name || !password || !participantsList.length) {
       setError("모든 항목을 입력해주세요.");
+      return;
+    }
+
+    const days = parseInt(expiresInDays, 10);
+    if (!days || days < 1 || days > 90) {
+      setError("만료 기한은 1일 이상 90일 이하로 입력해주세요.");
       return;
     }
 
@@ -59,7 +63,7 @@ export default function Home() {
       const res = await fetch("/api/schedules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, password, participants, expiresInDays }),
+        body: JSON.stringify({ name, password, participants: participantsList, expiresInDays: days }),
       });
 
       const data = await res.json();
@@ -223,15 +227,54 @@ export default function Home() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                     참여자
                   </label>
-                  <input
-                    type="text"
-                    value={participantsInput}
-                    onChange={(e) => setParticipantsInput(e.target.value)}
-                    placeholder="쉼표로 구분 (예: 민수, 영희, 철수)"
-                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm
-                      focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none
-                      placeholder:text-gray-400 dark:placeholder:text-gray-500 dark:text-gray-400"
-                  />
+                  {participantsList.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {participantsList.map((p, i) => (
+                        <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full
+                          bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-xs font-medium">
+                          {p}
+                          <button onClick={() => setParticipantsList((prev) => prev.filter((_, j) => j !== i))}
+                            className="text-blue-400 hover:text-blue-600 dark:text-blue-300 dark:hover:text-blue-100 leading-none">
+                            &times;
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={newParticipantName}
+                      onChange={(e) => setNewParticipantName(e.target.value)}
+                      placeholder="이름 입력"
+                      className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm
+                        focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none
+                        placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const trimmed = newParticipantName.trim();
+                          if (trimmed && !participantsList.includes(trimmed)) {
+                            setParticipantsList((prev) => [...prev, trimmed]);
+                            setNewParticipantName("");
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const trimmed = newParticipantName.trim();
+                        if (trimmed && !participantsList.includes(trimmed)) {
+                          setParticipantsList((prev) => [...prev, trimmed]);
+                          setNewParticipantName("");
+                        }
+                      }}
+                      className="px-3 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors"
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
 
                 <div>
@@ -239,18 +282,15 @@ export default function Home() {
                     만료 기한 (일)
                   </label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={expiresInDays}
-                    onChange={(e) =>
-                      setExpiresInDays(parseInt(e.target.value) || 90)
-                    }
-                    min={1}
-                    max={365}
+                    onChange={(e) => setExpiresInDays(e.target.value.replace(/[^0-9]/g, ""))}
                     className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm
                       focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                   />
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                    기본값: 90일 (약 3개월)
+                    1~90일 (기본값: 90일)
                   </p>
                 </div>
               </>
@@ -397,15 +437,11 @@ export default function Home() {
     };
 
     const handleSaveParticipants = async () => {
-      const newParticipants = participantsEditValue
-        .split(",")
-        .map((p) => p.trim())
-        .filter(Boolean);
-
-      if (!newParticipants.length) {
+      if (!participantsEditList.length) {
         setError("참여자를 최소 1명 이상 입력해주세요.");
         return;
       }
+      const newParticipants = participantsEditList;
 
       try {
         const res = await fetch(`/api/schedules/${schedule.id}/participants`, {
@@ -456,39 +492,65 @@ export default function Home() {
           </div>
           <div className="mt-1">
             {editingParticipants ? (
-              <div className="flex items-center gap-2 mt-1">
-                <input
-                  type="text"
-                  value={participantsEditValue}
-                  onChange={(e) => setParticipantsEditValue(e.target.value)}
-                  className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1 text-xs
-                    focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  placeholder="쉼표로 구분 (예: 민수, 영희, 철수)"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSaveParticipants();
-                    if (e.key === "Escape") setEditingParticipants(false);
-                  }}
-                  autoFocus
-                />
-                <button
-                  onClick={handleSaveParticipants}
-                  className="text-xs px-2 py-1 rounded-md bg-blue-500 text-white hover:bg-blue-600 font-medium"
-                >
-                  저장
-                </button>
-                <button
-                  onClick={() => setEditingParticipants(false)}
-                  className="text-xs px-2 py-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                  취소
-                </button>
+              <div className="mt-1 space-y-1.5">
+                <div className="flex flex-wrap gap-1">
+                  {participantsEditList.map((p, i) => (
+                    <span key={i} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full
+                      bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[11px] font-medium">
+                      {p}
+                      <button onClick={() => setParticipantsEditList((prev) => prev.filter((_, j) => j !== i))}
+                        className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-100 leading-none">&times;</button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={participantsEditInput}
+                    onChange={(e) => setParticipantsEditInput(e.target.value)}
+                    className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1 text-xs
+                      focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                    placeholder="이름 입력"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const trimmed = participantsEditInput.trim();
+                        if (trimmed && !participantsEditList.includes(trimmed)) {
+                          setParticipantsEditList((prev) => [...prev, trimmed]);
+                          setParticipantsEditInput("");
+                        }
+                      }
+                      if (e.key === "Escape") setEditingParticipants(false);
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => {
+                      const trimmed = participantsEditInput.trim();
+                      if (trimmed && !participantsEditList.includes(trimmed)) {
+                        setParticipantsEditList((prev) => [...prev, trimmed]);
+                        setParticipantsEditInput("");
+                      }
+                    }}
+                    className="text-xs px-2 py-1 rounded-md bg-blue-500 text-white hover:bg-blue-600 font-medium"
+                  >+</button>
+                  <button
+                    onClick={handleSaveParticipants}
+                    className="text-xs px-2 py-1 rounded-md bg-green-500 text-white hover:bg-green-600 font-medium"
+                  >저장</button>
+                  <button
+                    onClick={() => setEditingParticipants(false)}
+                    className="text-xs px-2 py-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                  >취소</button>
+                </div>
               </div>
             ) : (
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {schedule.participants.join(", ")}
                 <button
                   onClick={() => {
-                    setParticipantsEditValue(schedule.participants.join(", "));
+                    setParticipantsEditList([...schedule.participants]);
+                    setParticipantsEditInput("");
                     setEditingParticipants(true);
                   }}
                   className="ml-1.5 text-blue-400 hover:text-blue-500"
