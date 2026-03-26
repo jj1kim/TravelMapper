@@ -1,36 +1,138 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TravelMapper
+
+> A travel scheduler for those who want flexibility without chaos.
+
+TravelMapper isn't about building a rigid itinerary. It's about saving all your options in advance, then picking what to do on the fly based on how your trip unfolds.
+
+---
+
+## Key Features
+
+### Trip Timetable
+- Full 24-hour timeline with minute-level event positioning and 30-minute grid lines
+- Overview of all dates at a glance + detailed day view on tap
+- Confirmed events reflected in real time
+
+### Wishlist
+- **Transport** -- Flight/train name, departure/arrival locations (Google Maps integration), times, cost
+- **Food / Cafe & Dessert / Attractions** -- Location, business hours (drag-to-record on a timetable), cost
+- **Accommodation** -- Location, check-in/check-out times, stay dates (calendar range selection), cost
+- Free-text notes on every item with automatic URL hyperlinking
+
+### Confirming Events
+- **Transport & Accommodation** -- One-tap confirm, instantly shown on the timetable
+- **Food / Cafe / Attractions** -- Drag to set confirmed time within business hours (overlap prevention enforced)
+
+### "What Can I Do?"
+- Drag to select a free time slot on the timetable
+- Automatically filters wishlist items whose business hours overlap by 30+ minutes
+- Confirm events directly from the suggestion panel
+
+### Route Lookup
+- Select two confirmed events on the timetable
+- Opens Google Maps transit directions in a new tab
+- Departure time is automatically set to when the first event ends
+
+### Cost Management
+- Per-person cost calculated automatically from total cost and participant count
+- Category-level cost breakdown shown in a tooltip
+
+### And More
+- Dark mode support
+- Schedule expiration (default 90 days) with extension
+- Trip D-day / "Day N" / post-trip status display
+- Editable participant list
+- Mobile-responsive design
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS |
+| Database | Supabase (PostgreSQL) / SQLite (local dev) |
+| Maps | Google Maps Places API (New), Maps JavaScript API |
+| Deployment | Vercel |
+
+---
 
 ## Getting Started
 
-First, run the development server:
+### Local Development
 
 ```bash
+# Install dependencies
+npm install
+
+# Start dev server (runs on SQLite automatically without Supabase)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment Variables (Optional)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+cp .env.local.example .env.local
+```
 
-## Learn More
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | For deployment |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anonymous key | For deployment |
+| `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` | Google Maps API key | For place search |
 
-To learn more about Next.js, take a look at the following resources:
+> Without a Google Maps API key, locations can still be entered as plain text.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+---
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
+### Vercel + Supabase
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Push to GitHub
+2. Import project on [Vercel](https://vercel.com)
+3. Connect Supabase via Vercel Storage
+4. Run `supabase-schema.sql` in the Supabase SQL Editor
+5. Add Google Maps API key to environment variables
+6. Redeploy
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## Project Structure
+
+```
+src/
+  app/
+    api/                # API routes (schedules, wishlist, directions)
+    page.tsx            # Main page (landing / calendar / timeline)
+    layout.tsx          # Root layout
+    globals.css         # Global styles + dark mode
+  components/
+    Timeline.tsx        # Timetable (overview + day detail)
+    WishlistPanel.tsx   # Wishlist side panel
+    WhatToDoPanel.tsx   # "What Can I Do?" panel
+    CalendarPicker.tsx  # Trip date range picker
+    TransportForm.tsx   # Transport event form
+    PlaceForm.tsx       # Food / cafe / attraction form
+    StayForm.tsx        # Accommodation form
+    DragTimeTable.tsx   # Drag-to-select timetable (business hours / confirm)
+    ConfirmScheduleModal.tsx  # Confirm schedule modal
+    PlaceAutocomplete.tsx     # Google Maps place search
+    ThemeProvider.tsx   # Dark mode provider
+    TimeFieldInput.tsx  # 24-hour time input (HH:MM)
+  lib/
+    db.ts              # Database abstraction layer
+    db-local.ts        # SQLite implementation (local dev)
+    db-supabase.ts     # Supabase implementation (production)
+    types.ts           # TypeScript type definitions
+    routes.ts          # Google Routes API client
+    supabase.ts        # Supabase client
+```
+
+---
+
+## License
+
+MIT
