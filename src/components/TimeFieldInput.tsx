@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export function isValidTime(h: string, m: string): boolean {
   const hh = parseInt(h, 10);
@@ -14,6 +14,9 @@ export function isValidTimeStr(t: string): boolean {
   return isValidTime(parts[0], parts[1]);
 }
 
+const HOURS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"));
+
 export default function TimeFieldInput({
   value,
   onChange,
@@ -22,86 +25,100 @@ export default function TimeFieldInput({
   onChange: (v: string) => void;
 }) {
   const [hh, mm] = value.split(":");
-  const [hour, setHour] = useState(hh || "00");
-  const [minute, setMinute] = useState(mm || "00");
-  const minRef = useRef<HTMLInputElement>(null);
+  const hour = hh || "00";
+  const minute = mm || "00";
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hourListRef = useRef<HTMLDivElement>(null);
+  const minListRef = useRef<HTMLDivElement>(null);
 
-  const update = (h: string, m: string) => {
-    setHour(h);
-    setMinute(m);
-    onChange(`${h}:${m}`);
-  };
-
-  const handleHourChange = (raw: string) => {
-    const digits = raw.replace(/\D/g, "").slice(0, 2);
-    if (digits.length === 0) {
-      setHour("");
-      return;
-    }
-    if (digits.length === 1) {
-      const d = parseInt(digits, 10);
-      // 3-9 can only be 03-09, auto-complete and move to minutes
-      if (d >= 3) {
-        update(String(d).padStart(2, "0"), minute);
-        minRef.current?.focus();
-        minRef.current?.select();
-      } else {
-        // 0-2 could be start of 00-23, wait for second digit
-        setHour(digits);
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
       }
-      return;
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // Scroll to current values when opening
+  useEffect(() => {
+    if (!open) return;
+    const hIdx = HOURS.indexOf(hour);
+    const mIdx = MINUTES.findIndex((m) => parseInt(m, 10) >= parseInt(minute, 10));
+    if (hourListRef.current && hIdx >= 0) {
+      hourListRef.current.scrollTop = hIdx * 32 - 32;
     }
-    // 2 digits entered
-    const n = parseInt(digits, 10);
-    const clamped = String(Math.min(n, 23)).padStart(2, "0");
-    update(clamped, minute);
-    minRef.current?.focus();
-    minRef.current?.select();
+    if (minListRef.current && mIdx >= 0) {
+      minListRef.current.scrollTop = mIdx * 32 - 32;
+    }
+  }, [open, hour, minute]);
+
+  const selectHour = (h: string) => {
+    onChange(`${h}:${minute}`);
   };
 
-  const handleMinuteChange = (raw: string) => {
-    const digits = raw.replace(/\D/g, "").slice(0, 2);
-    if (digits.length === 0) {
-      setMinute("");
-      return;
-    }
-    if (digits.length === 1) {
-      const d = parseInt(digits, 10);
-      if (d >= 6) {
-        update(hour, String(d).padStart(2, "0"));
-      } else {
-        setMinute(digits);
-      }
-      return;
-    }
-    const n = parseInt(digits, 10);
-    const clamped = String(Math.min(n, 59)).padStart(2, "0");
-    update(hour, clamped);
-  };
-
-  const handleHourBlur = () => {
-    const padded = hour.padStart(2, "0");
-    const n = Math.min(parseInt(padded, 10) || 0, 23);
-    update(String(n).padStart(2, "0"), minute);
-  };
-
-  const handleMinuteBlur = () => {
-    const padded = minute.padStart(2, "0");
-    const n = Math.min(parseInt(padded, 10) || 0, 59);
-    update(hour, String(n).padStart(2, "0"));
+  const selectMinute = (m: string) => {
+    onChange(`${hour}:${m}`);
+    setOpen(false);
   };
 
   return (
-    <div className="flex items-center gap-0 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden w-[72px] focus-within:ring-2 focus-within:ring-blue-500">
-      <input type="text" inputMode="numeric" value={hour}
-        onChange={(e) => handleHourChange(e.target.value)} onBlur={handleHourBlur}
-        onFocus={(e) => e.target.select()} maxLength={2}
-        className="w-7 text-center text-sm py-1.5 outline-none bg-transparent" placeholder="00" />
-      <span className="text-sm text-gray-400 dark:text-gray-500 font-bold select-none">:</span>
-      <input ref={minRef} type="text" inputMode="numeric" value={minute}
-        onChange={(e) => handleMinuteChange(e.target.value)} onBlur={handleMinuteBlur}
-        onFocus={(e) => e.target.select()} maxLength={2}
-        className="w-7 text-center text-sm py-1.5 outline-none bg-transparent" placeholder="00" />
+    <div ref={containerRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-0 border border-gray-300 dark:border-gray-600 rounded-lg
+          overflow-hidden w-[72px] cursor-pointer hover:border-blue-400
+          focus:ring-2 focus:ring-blue-500 focus:outline-none"
+      >
+        <div className="w-7 text-center text-sm py-1.5 select-none">{hour}</div>
+        <span className="text-sm text-gray-400 dark:text-gray-500 font-bold select-none">:</span>
+        <div className="w-7 text-center text-sm py-1.5 select-none">{minute}</div>
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-800
+          border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg flex"
+          style={{ width: 72 }}>
+          {/* Hours */}
+          <div ref={hourListRef}
+            className="flex-1 overflow-y-auto overflow-x-hidden border-r border-gray-100 dark:border-gray-700
+              scrollbar-hide"
+            style={{ maxHeight: 150 }}>
+            {HOURS.map((h) => (
+              <button key={h} type="button"
+                onClick={() => selectHour(h)}
+                className={`w-full text-center text-xs py-1 transition-colors ${
+                  h === hour
+                    ? "bg-blue-500 text-white font-medium"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}>
+                {h}
+              </button>
+            ))}
+          </div>
+          {/* Minutes */}
+          <div ref={minListRef}
+            className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide"
+            style={{ maxHeight: 150 }}>
+            {MINUTES.map((m) => (
+              <button key={m} type="button"
+                onClick={() => selectMinute(m)}
+                className={`w-full text-center text-xs py-1 transition-colors ${
+                  m === minute
+                    ? "bg-blue-500 text-white font-medium"
+                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                }`}>
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
