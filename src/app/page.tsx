@@ -52,6 +52,20 @@ export default function Home() {
       return;
     }
 
+    // Validate schedule name: no emoji, only letters/numbers/spaces/common symbols
+    const nameRegex = /^[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ\s\-_.,!?@#&()'+:;/\\]+$/;
+    if (!nameRegex.test(name)) {
+      setError("스케줄 이름에 이모지나 특수 문자를 사용할 수 없습니다.");
+      return;
+    }
+
+    // Validate password: 4-20 chars, lowercase + numbers only
+    const pwRegex = /^[a-z0-9]{4,20}$/;
+    if (!pwRegex.test(password)) {
+      setError("비밀번호는 4~20자의 영문 소문자와 숫자 조합이어야 합니다.");
+      return;
+    }
+
     const days = parseInt(expiresInDays, 10);
     if (!days || days < 1 || days > 90) {
       setError("만료 기한은 1일 이상 90일 이하로 입력해주세요.");
@@ -214,7 +228,7 @@ export default function Home() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="스케줄 접근용 비밀번호"
+                placeholder="영문 소문자 + 숫자, 4~20자"
                 className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm
                   focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none
                   placeholder:text-gray-400 dark:placeholder:text-gray-500 dark:text-gray-400"

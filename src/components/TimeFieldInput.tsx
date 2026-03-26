@@ -33,26 +33,55 @@ export default function TimeFieldInput({
   };
 
   const handleHourChange = (raw: string) => {
-    const digits = raw.replace(/\D/g, "").slice(0, 2);
-    if (digits.length === 2) {
-      const n = parseInt(digits, 10);
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 0) {
+      setHour("");
+      return;
+    }
+    // Take only the last typed digit when overflowing
+    const lastDigit = digits.slice(-1);
+
+    if (hour.length === 0 || digits.length === 1) {
+      // First digit: if 3-9, treat as full hour (03-09)
+      const d = parseInt(lastDigit, 10);
+      if (d >= 3) {
+        update(String(d).padStart(2, "0"), minute);
+        minRef.current?.focus();
+        minRef.current?.select();
+      } else {
+        setHour(lastDigit);
+      }
+    } else {
+      // Second digit: combine with first
+      const combined = hour.slice(-1) + lastDigit;
+      const n = parseInt(combined, 10);
       const clamped = String(Math.min(n, 23)).padStart(2, "0");
       update(clamped, minute);
       minRef.current?.focus();
       minRef.current?.select();
-    } else {
-      setHour(digits);
     }
   };
 
   const handleMinuteChange = (raw: string) => {
-    const digits = raw.replace(/\D/g, "").slice(0, 2);
-    if (digits.length === 2) {
-      const n = parseInt(digits, 10);
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length === 0) {
+      setMinute("");
+      return;
+    }
+    const lastDigit = digits.slice(-1);
+
+    if (minute.length === 0 || digits.length === 1) {
+      const d = parseInt(lastDigit, 10);
+      if (d >= 6) {
+        update(hour, String(d).padStart(2, "0"));
+      } else {
+        setMinute(lastDigit);
+      }
+    } else {
+      const combined = minute.slice(-1) + lastDigit;
+      const n = parseInt(combined, 10);
       const clamped = String(Math.min(n, 59)).padStart(2, "0");
       update(hour, clamped);
-    } else {
-      setMinute(digits);
     }
   };
 
