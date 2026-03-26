@@ -1,65 +1,659 @@
-import Image from "next/image";
+"use client";
+
+import { useState } from "react";
+import CalendarPicker from "@/components/CalendarPicker";
+import Timeline from "@/components/Timeline";
+import type { SelectedTimeRange, SelectedEventInfo } from "@/components/Timeline";
+import WishlistPanel from "@/components/WishlistPanel";
+import WhatToDoPanel from "@/components/WhatToDoPanel";
+import ThemeToggle from "@/components/ThemeToggle";
+
+type View = "landing" | "calendar" | "timeline";
+type Mode = "create" | "login";
+
+interface ScheduleData {
+  id: string;
+  name: string;
+  participants: string[];
+  created_at: string;
+  expires_at: string;
+  trip_start: string | null;
+  trip_end: string | null;
+}
 
 export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+  const [view, setView] = useState<View>("landing");
+  const [mode, setMode] = useState<Mode>("create");
+  const [schedule, setSchedule] = useState<ScheduleData | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [wishlistOpen, setWishlistOpen] = useState(false);
+  const [timelineRefreshKey, setTimelineRefreshKey] = useState(0);
+  const [timelineDetailItemId, setTimelineDetailItemId] = useState<string | null>(null);
+  const [whatToDoMode, setWhatToDoMode] = useState(false);
+  const [whatToDoRange, setWhatToDoRange] = useState<SelectedTimeRange | null>(null);
+  const [feasibilityMode, setFeasibilityMode] = useState(false);
+  const [editingParticipants, setEditingParticipants] = useState(false);
+  const [participantsEditValue, setParticipantsEditValue] = useState("");
+
+  // Form fields
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [participantsInput, setParticipantsInput] = useState("");
+  const [expiresInDays, setExpiresInDays] = useState(90);
+
+  const handleCreate = async () => {
+    setError("");
+    const participants = participantsInput
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+
+    if (!name || !password || !participants.length) {
+      setError("모든 항목을 입력해주세요.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/schedules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, password, participants, expiresInDays }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error);
+        return;
+      }
+
+      setSchedule(data);
+      setView("calendar");
+    } catch {
+      setError("서버와 연결할 수 없습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    setError("");
+    if (!name || !password) {
+      setError("스케줄 이름과 비밀번호를 입력해주세요.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch("/api/schedules/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, password }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error);
+        return;
+      }
+
+      setSchedule(data);
+      if (data.trip_start && data.trip_end) {
+        setView("timeline");
+      } else {
+        setView("calendar");
+      }
+    } catch {
+      setError("서버와 연결할 수 없습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDatesSelected = async (start: string, end: string) => {
+    if (!schedule) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/schedules/${schedule.id}/trip-dates`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tripStart: start, tripEnd: end }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setSchedule(data);
+        setView("timeline");
+      } else {
+        setError(data.error);
+      }
+    } catch {
+      setError("서버와 연결할 수 없습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Landing page: create or login
+  if (view === "landing") {
+    return (
+      <main className="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-gray-900 dark:to-gray-950">
+        <div className="w-full max-w-md">
+          {/* Theme toggle */}
+          <div className="flex justify-end mb-2">
+            <ThemeToggle />
+          </div>
+
+          {/* Logo / Title */}
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              TravelMapper
+            </h1>
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              유동적이면서도 계획적인 여행을 위한 스케줄러
+            </p>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex rounded-xl bg-gray-100 dark:bg-gray-700 p-1 mb-6">
+            <button
+              onClick={() => {
+                setMode("create");
+                setError("");
+              }}
+              className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                mode === "create"
+                  ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+              }`}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              새 스케줄 만들기
+            </button>
+            <button
+              onClick={() => {
+                setMode("login");
+                setError("");
+              }}
+              className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                mode === "login"
+                  ? "bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:text-gray-300"
+              }`}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+              기존 스케줄 접속
+            </button>
+          </div>
+
+          {/* Form */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                스케줄 이름
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="예: 부산 여행 2026"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm
+                  focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none
+                  placeholder:text-gray-400 dark:placeholder:text-gray-500 dark:text-gray-400"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                비밀번호
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="스케줄 접근용 비밀번호"
+                className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm
+                  focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none
+                  placeholder:text-gray-400 dark:placeholder:text-gray-500 dark:text-gray-400"
+              />
+            </div>
+
+            {mode === "create" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    참여자
+                  </label>
+                  <input
+                    type="text"
+                    value={participantsInput}
+                    onChange={(e) => setParticipantsInput(e.target.value)}
+                    placeholder="쉼표로 구분 (예: 민수, 영희, 철수)"
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm
+                      focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none
+                      placeholder:text-gray-400 dark:placeholder:text-gray-500 dark:text-gray-400"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
+                    만료 기한 (일)
+                  </label>
+                  <input
+                    type="number"
+                    value={expiresInDays}
+                    onChange={(e) =>
+                      setExpiresInDays(parseInt(e.target.value) || 90)
+                    }
+                    min={1}
+                    max={365}
+                    className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2.5 text-sm
+                      focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    기본값: 90일 (약 3개월)
+                  </p>
+                </div>
+              </>
+            )}
+
+            {error && (
+              <div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm px-4 py-2.5 rounded-lg">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={mode === "create" ? handleCreate : handleLogin}
+              disabled={loading}
+              className={`w-full py-2.5 rounded-lg font-medium text-white transition-all ${
+                loading
+                  ? "bg-blue-400 cursor-wait"
+                  : "bg-blue-500 hover:bg-blue-600 active:bg-blue-700"
+              }`}
+            >
+              {loading
+                ? "처리 중..."
+                : mode === "create"
+                ? "스케줄 생성하기"
+                : "접속하기"}
+            </button>
+          </div>
         </div>
       </main>
-    </div>
-  );
+    );
+  }
+
+  // Calendar view: select trip dates
+  if (view === "calendar") {
+    return (
+      <main className="flex-1 flex items-center justify-center p-4 bg-gradient-to-br from-blue-50 to-sky-50 dark:from-gray-900 dark:to-gray-950">
+        <div className="w-full max-w-md">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+            <div className="text-center mb-6">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-1">
+                여행 일정이 어떻게 되시나요?
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                여행의 시작일과 종료일을 선택해주세요
+              </p>
+            </div>
+
+            <CalendarPicker
+              onDatesSelected={handleDatesSelected}
+              initialStart={schedule?.trip_start || undefined}
+              initialEnd={schedule?.trip_end || undefined}
+            />
+
+            {/* Cancel button — only when changing existing dates */}
+            {schedule?.trip_start && schedule?.trip_end && (
+              <button
+                onClick={() => setView("timeline")}
+                className="mt-3 w-full py-2 rounded-lg text-sm font-medium text-gray-500 dark:text-gray-400
+                  hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              >
+                취소
+              </button>
+            )}
+
+            {error && (
+              <div className="mt-4 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm px-4 py-2.5 rounded-lg">
+                {error}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Timeline view: main schedule
+  if (view === "timeline" && schedule?.trip_start && schedule?.trip_end) {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const expiresAt = new Date(schedule.expires_at);
+    const remainingDays = Math.ceil(
+      (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const canExtend = remainingDays <= 30;
+    const createdDate = new Date(schedule.created_at).toLocaleDateString("ko-KR");
+    const expiresDate = expiresAt.toLocaleDateString("ko-KR");
+
+    // Trip D-day calculation
+    const tripStartDate = new Date(schedule.trip_start + "T00:00:00");
+    const tripEndDate = new Date(schedule.trip_end + "T00:00:00");
+    const msPerDay = 1000 * 60 * 60 * 24;
+    const daysUntilStart = Math.ceil((tripStartDate.getTime() - today.getTime()) / msPerDay);
+    const daysSinceEnd = Math.floor((today.getTime() - tripEndDate.getTime()) / msPerDay);
+    const tripDayNumber = Math.floor((today.getTime() - tripStartDate.getTime()) / msPerDay) + 1;
+
+    let tripBadgeText: string;
+    let tripBadgeColor: string;
+    let tripMessage: string;
+
+    if (daysUntilStart > 0) {
+      // Before trip
+      tripBadgeText = `D-${daysUntilStart}`;
+      tripBadgeColor = daysUntilStart <= 7
+        ? "bg-blue-500 text-white"
+        : "bg-blue-100 text-blue-700";
+      tripMessage = daysUntilStart === 1
+        ? "내일 출발이에요!"
+        : `출발까지 ${daysUntilStart}일 남았어요`;
+    } else if (daysUntilStart === 0) {
+      // Departure day
+      tripBadgeText = "D-Day";
+      tripBadgeColor = "bg-green-500 text-white";
+      tripMessage = "오늘 출발하는 날이에요! 즐거운 여행 되세요";
+    } else if (daysSinceEnd <= 0) {
+      // During trip
+      tripBadgeText = `${tripDayNumber}일차`;
+      tripBadgeColor = "bg-green-500 text-white";
+      tripMessage = `여행 ${tripDayNumber}일차, 즐기고 계신가요?`;
+    } else {
+      // After trip
+      tripBadgeText = `여행 종료`;
+      tripBadgeColor = "bg-gray-400 text-white";
+      tripMessage = daysSinceEnd === 1
+        ? "어제 여행이 끝났어요. 수고하셨어요!"
+        : `여행이 끝난 지 ${daysSinceEnd}일 지났어요`;
+    }
+
+    const handleExtend = async (days: number) => {
+      try {
+        const res = await fetch(`/api/schedules/${schedule.id}/extend`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ days }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setSchedule(data);
+        } else {
+          setError(data.error);
+        }
+      } catch {
+        setError("서버와 연결할 수 없습니다.");
+      }
+    };
+
+    const handleSaveParticipants = async () => {
+      const newParticipants = participantsEditValue
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      if (!newParticipants.length) {
+        setError("참여자를 최소 1명 이상 입력해주세요.");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/schedules/${schedule.id}/participants`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ participants: newParticipants }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setSchedule(data);
+          setEditingParticipants(false);
+          setError("");
+        } else {
+          setError(data.error);
+        }
+      } catch {
+        setError("서버와 연결할 수 없습니다.");
+      }
+    };
+
+    return (
+      <main className="flex-1 flex flex-col p-4 bg-gray-50 dark:bg-gray-900 max-w-4xl mx-auto w-full">
+        {/* Schedule info header */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <h1 className="font-bold text-gray-800 dark:text-gray-200">{schedule.name}</h1>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${tripBadgeColor}`}>
+                {tripBadgeText}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setSchedule(null);
+                  setView("landing");
+                  setName("");
+                  setPassword("");
+                  setError("");
+                  setWishlistOpen(false);
+                }}
+                className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                나가기
+              </button>
+              <ThemeToggle />
+            </div>
+          </div>
+          <div className="mt-1">
+            {editingParticipants ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="text"
+                  value={participantsEditValue}
+                  onChange={(e) => setParticipantsEditValue(e.target.value)}
+                  className="flex-1 border border-gray-300 dark:border-gray-600 rounded-lg px-2.5 py-1 text-xs
+                    focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  placeholder="쉼표로 구분 (예: 민수, 영희, 철수)"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveParticipants();
+                    if (e.key === "Escape") setEditingParticipants(false);
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveParticipants}
+                  className="text-xs px-2 py-1 rounded-md bg-blue-500 text-white hover:bg-blue-600 font-medium"
+                >
+                  저장
+                </button>
+                <button
+                  onClick={() => setEditingParticipants(false)}
+                  className="text-xs px-2 py-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                >
+                  취소
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {schedule.participants.join(", ")}
+                <button
+                  onClick={() => {
+                    setParticipantsEditValue(schedule.participants.join(", "));
+                    setEditingParticipants(true);
+                  }}
+                  className="ml-1.5 text-blue-400 hover:text-blue-500"
+                >
+                  수정
+                </button>
+                <span className="mx-1 text-gray-300">·</span>
+                {tripMessage}
+              </p>
+            )}
+          </div>
+
+          {/* Expiration info */}
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              생성: {createdDate}
+            </span>
+            <span className={`text-xs font-medium ${
+              remainingDays <= 7
+                ? "text-red-500"
+                : remainingDays <= 30
+                ? "text-amber-500"
+                : "text-gray-500 dark:text-gray-400"
+            }`}>
+              만료: {expiresDate} (D-{remainingDays})
+            </span>
+
+            {canExtend && (
+              <div className="flex items-center gap-1.5 ml-auto">
+                <span className="text-xs text-amber-500">연장:</span>
+                {[30, 60, 90].map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => handleExtend(d)}
+                    className="text-xs px-2 py-1 rounded-md bg-blue-50 text-blue-600
+                      hover:bg-blue-100 transition-colors font-medium"
+                  >
+                    +{d}일
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {error && (
+            <div className="mt-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-xs px-3 py-2 rounded-lg">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Overlay when what-to-do or feasibility mode is active */}
+        {whatToDoMode && !whatToDoRange && (
+          <div className="fixed inset-0 bg-black/30 z-30 pointer-events-none" />
+        )}
+        {feasibilityMode && (
+          <div className="fixed inset-0 bg-black/30 z-30 cursor-pointer"
+            onClick={() => setFeasibilityMode(false)} />
+        )}
+
+        <div className={`flex-1 min-h-0 ${whatToDoMode || feasibilityMode ? "relative z-40" : ""}`}>
+          <Timeline
+            scheduleId={schedule.id}
+            tripStart={schedule.trip_start}
+            tripEnd={schedule.trip_end}
+            participants={schedule.participants}
+            onChangeDates={() => setView("calendar")}
+            onOpenWishlist={() => setWishlistOpen(true)}
+            onWhatToDo={() => setWhatToDoMode((v) => !v)}
+            onFeasibility={() => setFeasibilityMode((v) => !v)}
+            onFeasibilityCancel={() => setFeasibilityMode(false)}
+            onWishlistItemClick={(itemId) => {
+              setTimelineDetailItemId(itemId);
+              setWishlistOpen(true);
+            }}
+            refreshKey={timelineRefreshKey}
+            whatToDoMode={whatToDoMode && !whatToDoRange}
+            onWhatToDoSelect={(range) => {
+              setWhatToDoRange(range);
+            }}
+            feasibilityMode={feasibilityMode}
+            onFeasibilitySelect={async (start, end) => {
+              setFeasibilityMode(false);
+              try {
+                const res = await fetch(`/api/schedules/${schedule.id}/wishlist`);
+                if (!res.ok) return;
+                const items = await res.json();
+
+                const getLoc = (itemId: string, isStart: boolean) => {
+                  const item = items.find((i: { id: string }) => i.id === itemId);
+                  if (!item?.details) return null;
+                  const d = typeof item.details === "string" ? JSON.parse(item.details) : item.details;
+                  if (item.category === "교통") return isStart ? d.arrival_place : d.departure_place;
+                  return d.place;
+                };
+
+                const origin = getLoc(start.itemId, true);
+                const dest = getLoc(end.itemId, false);
+                if (!origin || !dest) return;
+
+                const originStr = origin.lat && origin.lng
+                  ? `${origin.lat},${origin.lng}` : origin.name;
+                const destStr = dest.lat && dest.lng
+                  ? `${dest.lat},${dest.lng}` : dest.name;
+
+                // !7e2 = local time epoch (seconds from 1970-01-01 00:00 LOCAL, not UTC)
+                const [y, mo, d] = start.date.split("-").map(Number);
+                const [h, m] = start.endTime.split(":").map(Number);
+                const localEpoch = Math.floor(Date.UTC(y, mo - 1, d, h, m, 0) / 1000);
+
+                const url = `https://www.google.com/maps/dir/${encodeURIComponent(originStr)}/${encodeURIComponent(destStr)}/data=!4m5!4m4!2m3!6e0!7e2!8j${localEpoch}!3e3`;
+                window.open(url, "_blank");
+              } catch { /* silently fail */ }
+            }}
+          />
+        </div>
+
+        {/* Overlay stays during panel open */}
+        {whatToDoRange && (
+          <div className="fixed inset-0 bg-black/30 z-30 pointer-events-none" />
+        )}
+
+        <WishlistPanel
+          scheduleId={schedule.id}
+          participants={schedule.participants}
+          tripStart={schedule.trip_start}
+          tripEnd={schedule.trip_end}
+          isOpen={wishlistOpen}
+          onClose={() => { setWishlistOpen(false); setTimelineDetailItemId(null); }}
+          onConfirmChange={() => setTimelineRefreshKey((k) => k + 1)}
+          openItemId={timelineDetailItemId}
+          onItemOpened={() => setTimelineDetailItemId(null)}
+        />
+
+        {whatToDoRange && (
+          <WhatToDoPanel
+            scheduleId={schedule.id}
+            participants={schedule.participants}
+            tripDates={(() => {
+              const d: string[] = [];
+              const cur = new Date(schedule.trip_start + "T00:00:00");
+              const last = new Date(schedule.trip_end + "T00:00:00");
+              while (cur <= last) {
+                const y = cur.getFullYear();
+                const m = String(cur.getMonth() + 1).padStart(2, "0");
+                const dd = String(cur.getDate()).padStart(2, "0");
+                d.push(`${y}-${m}-${dd}`);
+                cur.setDate(cur.getDate() + 1);
+              }
+              return d;
+            })()}
+            selectedRange={whatToDoRange}
+            isOpen={true}
+            onClose={() => {
+              setWhatToDoRange(null);
+              setWhatToDoMode(false);
+              setTimelineRefreshKey((k) => k + 1);
+            }}
+            onConfirmChange={() => setTimelineRefreshKey((k) => k + 1)}
+          />
+        )}
+
+      </main>
+    );
+  }
+
+  return null;
 }
