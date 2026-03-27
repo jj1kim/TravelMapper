@@ -150,20 +150,20 @@ export default function MapViewModal({
     const bounds = new window.google.maps.LatLngBounds();
 
     for (const pin of pins) {
-      const strokeColor = pin.item.confirmed ? "#16A34A" : "#D1D5DB";
+      const strokeColor = pin.item.confirmed ? "#EF4444" : "#D1D5DB";
       const marker = new window.google.maps.Marker({
         position: { lat: pin.lat, lng: pin.lng },
         map: mapInstanceRef.current,
         title: pin.item.title,
         icon: {
           url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
-              <circle cx="14" cy="14" r="12" fill="${pin.color}" stroke="${strokeColor}" stroke-width="3"/>
-              <text x="14" y="19" text-anchor="middle" font-size="15">${CATEGORY_ICONS[pin.item.category] || "•"}</text>
+            `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15" fill="${pin.color}" stroke="${strokeColor}" stroke-width="3"/>
+              <text x="18" y="24" text-anchor="middle" font-size="20">${CATEGORY_ICONS[pin.item.category] || "•"}</text>
             </svg>`
           )}`,
-          scaledSize: new window.google.maps.Size(28, 28),
-          anchor: new window.google.maps.Point(14, 14),
+          scaledSize: new window.google.maps.Size(36, 36),
+          anchor: new window.google.maps.Point(18, 18),
         },
       });
 
@@ -221,7 +221,7 @@ export default function MapViewModal({
           <div className="flex items-center gap-1 flex-shrink-0 ml-2 pl-2 border-l border-gray-200 dark:border-gray-600">
             <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-gray-300" />
             <span className="text-xs text-gray-400 dark:text-gray-500">미확정</span>
-            <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-green-500 ml-1" />
+            <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-red-500 ml-1" />
             <span className="text-xs text-gray-400 dark:text-gray-500">확정</span>
           </div>
         </div>
