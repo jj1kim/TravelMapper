@@ -8,6 +8,7 @@ import type { SelectedTimeRange, SelectedEventInfo } from "@/components/Timeline
 import WishlistPanel from "@/components/WishlistPanel";
 import WhatToDoPanel from "@/components/WhatToDoPanel";
 import ThemeToggle from "@/components/ThemeToggle";
+import MapViewModal from "@/components/MapViewModal";
 
 type View = "landing" | "calendar" | "timeline";
 type Mode = "create" | "login";
@@ -34,6 +35,8 @@ export default function Home() {
   const [whatToDoMode, setWhatToDoMode] = useState(false);
   const [whatToDoRange, setWhatToDoRange] = useState<SelectedTimeRange | null>(null);
   const [feasibilityMode, setFeasibilityMode] = useState(false);
+  const [mapViewOpen, setMapViewOpen] = useState(false);
+  const [mapViewDetailItem, setMapViewDetailItem] = useState<null | { id: string }>(null);
   const [editingParticipants, setEditingParticipants] = useState(false);
   const [participantsEditList, setParticipantsEditList] = useState<string[]>([]);
   const [participantsEditInput, setParticipantsEditInput] = useState("");
@@ -650,6 +653,7 @@ export default function Home() {
             onWhatToDo={() => setWhatToDoMode((v) => !v)}
             onFeasibility={() => setFeasibilityMode((v) => !v)}
             onFeasibilityCancel={() => setFeasibilityMode(false)}
+            onMapView={() => setMapViewOpen(true)}
             onWishlistItemClick={(itemId) => {
               setTimelineDetailItemId(itemId);
               setWishlistOpen(true);
@@ -712,6 +716,34 @@ export default function Home() {
           openItemId={timelineDetailItemId}
           onItemOpened={() => setTimelineDetailItemId(null)}
         />
+
+        {mapViewOpen && (
+          <MapViewModal
+            scheduleId={schedule.id}
+            participants={schedule.participants}
+            tripStart={schedule.trip_start}
+            tripEnd={schedule.trip_end}
+            tripDates={(() => {
+              const d: string[] = [];
+              const cur = new Date(schedule.trip_start + "T00:00:00");
+              const last = new Date(schedule.trip_end + "T00:00:00");
+              while (cur <= last) {
+                const y = cur.getFullYear();
+                const m = String(cur.getMonth() + 1).padStart(2, "0");
+                const dd = String(cur.getDate()).padStart(2, "0");
+                d.push(`${y}-${m}-${dd}`);
+                cur.setDate(cur.getDate() + 1);
+              }
+              return d;
+            })()}
+            onClose={() => { setMapViewOpen(false); setMapViewDetailItem(null); }}
+            onItemClick={(item) => {
+              setMapViewDetailItem(item);
+              setTimelineDetailItemId(item.id);
+              setWishlistOpen(true);
+            }}
+          />
+        )}
 
         {whatToDoRange && (
           <WhatToDoPanel

@@ -20,6 +20,7 @@ interface TimelineProps {
   onWhatToDo?: () => void;
   onFeasibility?: () => void;
   onFeasibilityCancel?: () => void;
+  onMapView?: () => void;
   refreshKey?: number;
   whatToDoMode?: boolean;
   onWhatToDoSelect?: (range: SelectedTimeRange) => void;
@@ -102,6 +103,7 @@ export default function Timeline({
   onWhatToDo,
   onFeasibility,
   onFeasibilityCancel,
+  onMapView,
   refreshKey,
   whatToDoMode,
   onWhatToDoSelect,
@@ -422,6 +424,14 @@ export default function Timeline({
               hover:bg-gray-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             위시리스트
+          </button>
+          <button
+            onClick={onMapView}
+            disabled={isActiveMode}
+            className="flex-shrink-0 text-xs px-3 py-1.5 rounded font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+              bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-800/40"
+          >
+            한눈에 보기
           </button>
           <button
             onClick={onWhatToDo}
