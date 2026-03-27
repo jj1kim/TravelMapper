@@ -75,7 +75,6 @@ export default function MapViewModal({
   const [pins, setPins] = useState<PinItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [mapReady, setMapReady] = useState(false);
-  const [selectedPin, setSelectedPin] = useState<WishlistItem | null>(null);
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
@@ -151,25 +150,25 @@ export default function MapViewModal({
     const bounds = new window.google.maps.LatLngBounds();
 
     for (const pin of pins) {
+      const strokeColor = pin.item.confirmed ? "#16A34A" : "#D1D5DB";
       const marker = new window.google.maps.Marker({
         position: { lat: pin.lat, lng: pin.lng },
         map: mapInstanceRef.current,
         title: pin.item.title,
         icon: {
           url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
-            `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44">
-              <path d="M18 0C8.06 0 0 8.06 0 18c0 13.5 18 26 18 26s18-12.5 18-26C36 8.06 27.94 0 18 0z"
-                fill="${pin.item.confirmed ? pin.color : "#9CA3AF"}" stroke="white" stroke-width="2"/>
-              <text x="18" y="20" text-anchor="middle" font-size="14" fill="white">${CATEGORY_ICONS[pin.item.category] || "•"}</text>
+            `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">
+              <circle cx="14" cy="14" r="12" fill="${pin.color}" stroke="${strokeColor}" stroke-width="3"/>
+              <text x="14" y="19" text-anchor="middle" font-size="15">${CATEGORY_ICONS[pin.item.category] || "•"}</text>
             </svg>`
           )}`,
-          scaledSize: new window.google.maps.Size(36, 44),
-          anchor: new window.google.maps.Point(18, 44),
+          scaledSize: new window.google.maps.Size(28, 28),
+          anchor: new window.google.maps.Point(14, 14),
         },
       });
 
       marker.addListener("click", () => {
-        setSelectedPin(pin.item);
+        onItemClick(pin.item);
       });
 
       bounds.extend({ lat: pin.lat, lng: pin.lng });
@@ -187,7 +186,7 @@ export default function MapViewModal({
   const categories = [...new Set(pins.map((p) => p.item.category))];
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col bg-white dark:bg-gray-900">
+    <div className="fixed inset-0 z-[55] flex flex-col bg-white dark:bg-gray-900">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700
         bg-white dark:bg-gray-800 z-10">
@@ -220,10 +219,10 @@ export default function MapViewModal({
             </div>
           ))}
           <div className="flex items-center gap-1 flex-shrink-0 ml-2 pl-2 border-l border-gray-200 dark:border-gray-600">
-            <div className="w-3 h-3 rounded-full bg-gray-400" />
+            <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-gray-300" />
             <span className="text-xs text-gray-400 dark:text-gray-500">미확정</span>
-            <div className="w-3 h-3 rounded-full bg-blue-500 ml-1" />
-            <span className="text-xs text-gray-400 dark:text-gray-500">확정(색상)</span>
+            <div className="w-3 h-3 rounded-full bg-gray-300 border-2 border-green-500 ml-1" />
+            <span className="text-xs text-gray-400 dark:text-gray-500">확정</span>
           </div>
         </div>
       )}
@@ -251,77 +250,6 @@ export default function MapViewModal({
         <div ref={mapRef} className="w-full h-full" />
       </div>
 
-      {/* Item detail modal triggered by pin click */}
-      {selectedPin && (
-        <ItemDetailOnMap
-          item={selectedPin}
-          participants={participants}
-          onClose={() => setSelectedPin(null)}
-          onOpenFull={() => {
-            onItemClick(selectedPin);
-            setSelectedPin(null);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// Lightweight detail card on the map
-function ItemDetailOnMap({
-  item,
-  participants,
-  onClose,
-  onOpenFull,
-}: {
-  item: WishlistItem;
-  participants: string[];
-  onClose: () => void;
-  onOpenFull: () => void;
-}) {
-  const place = parsePlaceDetails(item);
-  const stay = parseStayDetails(item);
-  const details = place || stay;
-  const cost = details?.cost || 0;
-
-  return (
-    <div className="absolute bottom-4 left-4 right-4 z-20 flex justify-center">
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-200 dark:border-gray-700
-        w-full max-w-sm p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 mb-1">
-              <span className="text-base">{CATEGORY_ICONS[item.category]}</span>
-              <span className={`text-sm font-bold ${
-                item.confirmed ? "text-green-700 dark:text-green-400" : "text-gray-800 dark:text-gray-200"
-              }`}>
-                {item.title}
-              </span>
-              {item.confirmed && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40
-                  text-green-700 dark:text-green-400 font-medium">확정</span>
-              )}
-            </div>
-            {details && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{details.place.name}</p>
-            )}
-            {cost > 0 && (
-              <p className="text-xs text-blue-500 dark:text-blue-400 mt-0.5">
-                인당 {Math.floor(cost / participants.length).toLocaleString()}원
-              </p>
-            )}
-            <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">{item.added_by}</p>
-          </div>
-          <button onClick={onClose}
-            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none flex-shrink-0">
-            &times;
-          </button>
-        </div>
-        <button onClick={onOpenFull}
-          className="mt-2 w-full py-1.5 rounded-lg text-xs font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors">
-          상세 보기
-        </button>
-      </div>
     </div>
   );
 }
