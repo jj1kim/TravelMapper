@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import CalendarPicker from "@/components/CalendarPicker";
 import { useGuardState } from "@/lib/guard";
 import Timeline from "@/components/Timeline";
@@ -48,6 +48,49 @@ export default function Home() {
   const [newParticipantName, setNewParticipantName] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("90");
   const [pageGuard, pageBusy] = useGuardState();
+  const [shareMessage, setShareMessage] = useState("");
+
+  // Handle share link on page load
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("s");
+    if (!token) return;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/schedules/share?token=${encodeURIComponent(token)}`);
+        const data = await res.json();
+        if (res.ok) {
+          setSchedule(data);
+          if (data.trip_start && data.trip_end) {
+            setView("timeline");
+          } else {
+            setView("calendar");
+          }
+          // Clean URL without reload
+          window.history.replaceState({}, "", window.location.pathname);
+        }
+      } catch { /* silently fail, show landing */ }
+    })();
+  }, []);
+
+  const handleShareLink = useCallback(async () => {
+    if (!schedule) return;
+    try {
+      const res = await fetch("/api/schedules/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduleId: schedule.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        const url = `${window.location.origin}?s=${data.token}`;
+        await navigator.clipboard.writeText(url);
+        setShareMessage("링크가 복사되었습니다!");
+        setTimeout(() => setShareMessage(""), 2000);
+      }
+    } catch { /* silently fail */ }
+  }, [schedule]);
 
   const handleCreate = () => pageGuard(async () => {
     setError("");
@@ -500,6 +543,18 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <h1 className="font-bold text-gray-800 dark:text-gray-200">{schedule.name}</h1>
+              <button onClick={handleShareLink} title="공유 링크 복사"
+                className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+              </button>
+              {shareMessage && (
+                <span className="text-xs text-green-600 dark:text-green-400 font-medium animate-pulse">
+                  {shareMessage}
+                </span>
+              )}
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${tripBadgeColor}`}>
                 {tripBadgeText}
               </span>

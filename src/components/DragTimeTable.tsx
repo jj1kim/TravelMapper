@@ -55,7 +55,7 @@ export default function DragTimeTable({
   availableSlots,
   snapMinutes = 10,
   slotHeight = 4,
-  startHour = 6,
+  startHour = 0,
   endHour = 24,
   blockColor = "#3B82F6",
   availableColor = "#DBEAFE",
@@ -98,23 +98,25 @@ export default function DragTimeTable({
       if (!containerRef.current) return null;
       const rect = containerRef.current.getBoundingClientRect();
       const scrollTop = containerRef.current.scrollTop;
-      const headerH = 32;
+      const headerH = 32 + 12; // header + spacer
       const timeLabelW = 40;
       const x = clientX - rect.left - timeLabelW;
       const y = clientY - rect.top + scrollTop - headerH;
-      if (x < 0 || y < 0) return null;
+      if (x < 0) return null;
+      const clampedY = Math.max(0, y); // spacer area → treat as 0:00
 
       const colWidth = (rect.width - timeLabelW) / dates.length;
       const colIdx = Math.floor(x / colWidth);
       if (colIdx < 0 || colIdx >= dates.length) return null;
 
-      const min = getTimeFromY(y);
+      const min = getTimeFromY(clampedY);
       return { date: dates[colIdx], min: Math.max(startOffset, Math.min(endHour * 60, min)) };
     },
     [dates, getTimeFromY, startOffset, endHour]
   );
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    e.preventDefault(); // prevent browser default drag behavior
     // Close tooltip on any tap
     setTooltipIdx(null);
 
@@ -196,8 +198,8 @@ export default function DragTimeTable({
         ))}
       </div>
 
-      {/* Body */}
-      <div className="flex" style={{ height: totalHeight }}>
+      {/* Body — pt-3 for easier 00:00 selection */}
+      <div className="flex pt-3" style={{ height: totalHeight + 12 }}>
         {/* Time labels */}
         <div className="flex-shrink-0 relative" style={{ width: 40, height: totalHeight }}>
           {gridLines.filter((m) => m % 60 === 0).map((m) => (
